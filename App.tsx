@@ -1,20 +1,75 @@
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ProvedorBancoDados, useBancoDados } from '@/contextos/ContextoBancoDados';
+import { ProvedorMesSelecionado } from '@/contextos/ContextoMesSelecionado';
+import NavegacaoPrincipal from '@/navegacao/NavegacaoPrincipal';
+import FundoApp from '@/componentes/comuns/FundoApp';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { CORES } from '@/utilitarios/constantes';
 
-export default function App() {
+function AppConteudo() {
+  const { carregando, erro } = useBancoDados();
+
+  if (carregando) {
+    return (
+      <FundoApp>
+        <View style={estilos.carregando}>
+          <ActivityIndicator size="large" color={CORES.primaria} />
+          <Text style={estilos.textoCarregando}>Carregando...</Text>
+        </View>
+      </FundoApp>
+    );
+  }
+
+  if (erro) {
+    return (
+      <FundoApp>
+        <View style={estilos.carregando}>
+          <Text style={estilos.textoErro}>Erro ao inicializar: {erro}</Text>
+        </View>
+      </FundoApp>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <FundoApp>
+      <NavigationContainer>
+        <ProvedorMesSelecionado>
+          <NavegacaoPrincipal />
+        </ProvedorMesSelecionado>
+        <StatusBar style="light" />
+      </NavigationContainer>
+    </FundoApp>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ProvedorBancoDados>
+        <AppConteudo />
+      </ProvedorBancoDados>
+    </SafeAreaProvider>
+  );
+}
+
+const estilos = StyleSheet.create({
+  carregando: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textoCarregando: {
+    marginTop: 12,
+    fontSize: 16,
+    color: CORES.textoSecundario,
+  },
+  textoErro: {
+    fontSize: 16,
+    color: CORES.erro,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });

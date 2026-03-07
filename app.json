@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AppTemp",
-    "slug": "AppTemp",
+    "name": "Baita Gestão Financeira",
+    "slug": "baita-gestao-financeira",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,6 +15,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.baitadev.gestaofinanceira",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,6 +26,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/c6e03a76-6e4f-49ae-bcd5-d002d2b13ab4"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c6e03a76-6e4f-49ae-bcd5-d002d2b13ab4"
+      }
+    },
+    "owner": "nenyrs"
   }
 }
