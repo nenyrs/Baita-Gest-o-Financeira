@@ -60,6 +60,34 @@ export function useSaidas() {
     [banco, carregar]
   );
 
+  const atualizar = useCallback(
+    async (id: number, dados: Omit<Saida, 'id' | 'criado_em'>) => {
+      if (!banco) return;
+
+      // Remove parcelas antigas e recria se necessario
+      await repoParcelas.excluirParcelasPorSaida(banco, id);
+      await repoSaidas.atualizarSaida(banco, id, dados);
+
+      if ((dados.metodo_pagamento === 'credito' || dados.metodo_pagamento === 'debito') && dados.cartao_id && dados.total_parcelas > 0) {
+        const cartao = await repoCartoes.buscarCartao(banco, dados.cartao_id);
+        if (cartao) {
+          const parcelas = gerarParcelas(
+            id,
+            dados.cartao_id,
+            dados.valor,
+            dados.total_parcelas,
+            stringParaData(dados.data),
+            cartao.dia_fechamento
+          );
+          await repoParcelas.criarParcelas(banco, parcelas);
+        }
+      }
+
+      await carregar();
+    },
+    [banco, carregar]
+  );
+
   const excluir = useCallback(
     async (id: number) => {
       if (!banco) return;
@@ -70,5 +98,5 @@ export function useSaidas() {
     [banco, carregar]
   );
 
-  return { saidas, carregando, criar, excluir, recarregar: carregar };
+  return { saidas, carregando, criar, atualizar, excluir, recarregar: carregar };
 }

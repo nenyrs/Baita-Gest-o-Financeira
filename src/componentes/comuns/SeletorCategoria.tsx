@@ -32,6 +32,9 @@ export default function SeletorCategoria({
           <FlatList
             data={categorias}
             keyExtractor={(item) => item.id.toString()}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[

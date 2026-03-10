@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Switch,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CORES, METODOS_PAGAMENTO } from '@/utilitarios/constantes';
 import { dataParaString } from '@/utilitarios/formatadores';
@@ -22,10 +23,14 @@ import SeletorCategoria from '@/componentes/comuns/SeletorCategoria';
 import SeletorData from '@/componentes/comuns/SeletorData';
 
 type NavegacaoSaidas = NativeStackNavigationProp<AbaSaidasParams, 'TelaFormSaida'>;
+type RotaSaida = RouteProp<AbaSaidasParams, 'TelaFormSaida'>;
 
 export default function TelaFormSaida() {
   const navegacao = useNavigation<NavegacaoSaidas>();
-  const { criar } = useSaidas();
+  const rota = useRoute<RotaSaida>();
+  const idEdicao = rota.params?.id;
+
+  const { saidas, criar, atualizar } = useSaidas();
   const { cartoes } = useCartoes();
   const { categorias } = useCategorias('saida');
 
@@ -36,12 +41,37 @@ export default function TelaFormSaida() {
   const [metodoPagamento, setMetodoPagamento] = useState<MetodoPagamento>('pix');
   const [cartaoId, setCartaoId] = useState<number | null>(null);
   const [totalParcelas, setTotalParcelas] = useState('1');
+  const [valorEhTotal, setValorEhTotal] = useState(true);
   const [modalCategoriaVisivel, setModalCategoriaVisivel] = useState(false);
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (idEdicao) {
+      const saida = saidas.find((s) => s.id === idEdicao);
+      if (saida) {
+        setTitulo(saida.titulo);
+        setValor(String(saida.valor));
+        setData(saida.data);
+        setCategoriaId(saida.categoria_id);
+        setMetodoPagamento(saida.metodo_pagamento as MetodoPagamento);
+        setCartaoId(saida.cartao_id);
+        setTotalParcelas(String(saida.total_parcelas || 1));
+        setValorEhTotal(false); // Em edicao, o valor ja esta por parcela
+      }
+    }
+  }, [idEdicao, saidas]);
 
   const categoriaSelecionada = categorias.find((c) => c.id === categoriaId);
   const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
   const usaCartao = metodoPagamento === 'credito' || metodoPagamento === 'debito';
+  const ehCredito = metodoPagamento === 'credito';
+  const numParcelas = parseInt(totalParcelas, 10) || 1;
+  const valorNumericoPreview = parseFloat(valor.replace(',', '.')) || 0;
+
+  // Calcula valor da parcela para preview
+  const valorParcelaPreview = ehCredito && valorEhTotal && numParcelas > 1
+    ? Math.round((valorNumericoPreview / numParcelas) * 100) / 100
+    : valorNumericoPreview;
 
   async function handleSalvar() {
     if (!titulo.trim()) {
@@ -49,8 +79,8 @@ export default function TelaFormSaida() {
       return;
     }
 
-    const valorNumerico = parseFloat(valor.replace(',', '.'));
-    if (isNaN(valorNumerico) || valorNumerico <= 0) {
+    const valorDigitado = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorDigitado) || valorDigitado <= 0) {
       Alert.alert('Erro', 'Informe um valor valido.');
       return;
     }
@@ -66,21 +96,33 @@ export default function TelaFormSaida() {
     }
 
     // Credito: parcelas informadas; Debito: 1 parcela (respeita fechamento do cartao)
-    const parcelas = metodoPagamento === 'credito'
-      ? parseInt(totalParcelas, 10) || 1
+    const parcelas = ehCredito
+      ? numParcelas
       : metodoPagamento === 'debito' ? 1 : 0;
+
+    // Se "Valor Total" estiver ativo no credito, o valor salvo por parcela = valorDigitado / parcelas
+    // O valor salvo na saida eh o valor da parcela (que sera multiplicado no gerarParcelas)
+    const valorFinal = ehCredito && valorEhTotal && numParcelas > 1
+      ? Math.round((valorDigitado / numParcelas) * 100) / 100
+      : valorDigitado;
 
     setSalvando(true);
     try {
-      await criar({
+      const dados = {
         titulo: titulo.trim(),
-        valor: valorNumerico,
+        valor: valorFinal,
         data,
         categoria_id: categoriaId,
         metodo_pagamento: metodoPagamento,
         cartao_id: usaCartao ? cartaoId : null,
         total_parcelas: parcelas,
-      });
+      };
+
+      if (idEdicao) {
+        await atualizar(idEdicao, dados);
+      } else {
+        await criar(dados);
+      }
 
       navegacao.goBack();
     } catch (erro) {
@@ -92,7 +134,9 @@ export default function TelaFormSaida() {
 
   return (
     <ScrollView style={estilos.container} contentContainerStyle={estilos.conteudo}>
-      <Text style={estilos.tituloPagina}>Nova Saida</Text>
+      <Text style={estilos.tituloPagina}>
+        {idEdicao ? 'Editar Saida' : 'Nova Saida'}
+      </Text>
 
       <CampoTexto
         rotulo="Titulo"
@@ -145,6 +189,7 @@ export default function TelaFormSaida() {
               if (metodo.valor === 'pix') {
                 setCartaoId(null);
                 setTotalParcelas('1');
+                setValorEhTotal(true);
               }
             }}
           >
@@ -199,14 +244,48 @@ export default function TelaFormSaida() {
             </View>
           )}
 
-          {metodoPagamento === 'credito' && (
-            <CampoTexto
-              rotulo="Numero de Parcelas"
-              placeholder="1"
-              value={totalParcelas}
-              onChangeText={setTotalParcelas}
-              keyboardType="numeric"
-            />
+          {ehCredito && (
+            <>
+              <CampoTexto
+                rotulo="Numero de Parcelas"
+                placeholder="1"
+                value={totalParcelas}
+                onChangeText={setTotalParcelas}
+                keyboardType="numeric"
+              />
+
+              {numParcelas > 1 && (
+                <>
+                  <View style={estilos.linhaSwitch}>
+                    <View>
+                      <Text style={estilos.rotuloSwitch}>Valor e total</Text>
+                      <Text style={estilos.descricaoSwitch}>
+                        {valorEhTotal
+                          ? 'O valor sera dividido pelas parcelas'
+                          : 'Cada parcela tera o valor informado'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={valorEhTotal}
+                      onValueChange={setValorEhTotal}
+                      trackColor={{ false: CORES.borda, true: 'rgba(33,150,243,0.4)' }}
+                      thumbColor={valorEhTotal ? CORES.primaria : CORES.textoSecundario}
+                    />
+                  </View>
+
+                  {valorNumericoPreview > 0 && (
+                    <View style={estilos.previewParcelas}>
+                      <Text style={estilos.previewTexto}>
+                        {numParcelas}x de R$ {valorParcelaPreview.toFixed(2).replace('.', ',')}
+                        {valorEhTotal
+                          ? ` (total R$ ${valorNumericoPreview.toFixed(2).replace('.', ',')})`
+                          : ` (total R$ ${(valorNumericoPreview * numParcelas).toFixed(2).replace('.', ',')})`}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </>
           )}
         </View>
       )}
@@ -318,6 +397,40 @@ const estilos = StyleSheet.create({
     color: CORES.primaria,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  linhaSwitch: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: CORES.fundoCartao,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  rotuloSwitch: {
+    fontSize: 15,
+    color: CORES.texto,
+    fontWeight: '600',
+  },
+  descricaoSwitch: {
+    fontSize: 12,
+    color: CORES.textoSecundario,
+    marginTop: 2,
+  },
+  previewParcelas: {
+    backgroundColor: 'rgba(76,175,80,0.08)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  previewTexto: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   botaoSalvar: {
     marginTop: 8,

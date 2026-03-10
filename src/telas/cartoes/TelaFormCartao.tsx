@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CORES } from '@/utilitarios/constantes';
 import { AbaCartoesParams } from '@/tipos/Navegacao';
@@ -9,16 +9,32 @@ import CampoTexto from '@/componentes/comuns/CampoTexto';
 import Botao from '@/componentes/comuns/Botao';
 
 type NavegacaoCartoes = NativeStackNavigationProp<AbaCartoesParams, 'TelaFormCartao'>;
+type RotaCartao = RouteProp<AbaCartoesParams, 'TelaFormCartao'>;
 
 export default function TelaFormCartao() {
   const navegacao = useNavigation<NavegacaoCartoes>();
-  const { criar } = useCartoes();
+  const rota = useRoute<RotaCartao>();
+  const idEdicao = rota.params?.id;
+
+  const { cartoes, criar, atualizar } = useCartoes();
 
   const [nome, setNome] = useState('');
   const [limiteTotal, setLimiteTotal] = useState('');
   const [diaVencimento, setDiaVencimento] = useState('');
   const [diaFechamento, setDiaFechamento] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (idEdicao) {
+      const cartao = cartoes.find((c) => c.id === idEdicao);
+      if (cartao) {
+        setNome(cartao.nome);
+        setLimiteTotal(String(cartao.limite_total));
+        setDiaVencimento(String(cartao.dia_vencimento));
+        setDiaFechamento(String(cartao.dia_fechamento));
+      }
+    }
+  }, [idEdicao, cartoes]);
 
   async function handleSalvar() {
     if (!nome.trim()) {
@@ -46,12 +62,18 @@ export default function TelaFormCartao() {
 
     setSalvando(true);
     try {
-      await criar({
+      const dados = {
         nome: nome.trim(),
         limite_total: limiteNumerico,
         dia_vencimento: vencimento,
         dia_fechamento: fechamento,
-      });
+      };
+
+      if (idEdicao) {
+        await atualizar(idEdicao, dados);
+      } else {
+        await criar(dados);
+      }
 
       navegacao.goBack();
     } catch (erro) {
@@ -63,7 +85,9 @@ export default function TelaFormCartao() {
 
   return (
     <ScrollView style={estilos.container} contentContainerStyle={estilos.conteudo}>
-      <Text style={estilos.tituloPagina}>Novo Cartao</Text>
+      <Text style={estilos.tituloPagina}>
+        {idEdicao ? 'Editar Cartao' : 'Novo Cartao'}
+      </Text>
 
       <CampoTexto
         rotulo="Nome"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useBancoDados } from '@/contextos/ContextoBancoDados';
 import * as repoParcelas from '@/repositorios/RepositorioParcelas';
 import * as repoSaidas from '@/repositorios/RepositorioSaidas';
@@ -37,6 +37,12 @@ export default function TelaFaturaCartao() {
   }, [banco, cartaoId, mesReferencia]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar])
+  );
 
   return (
     <View style={estilos.container}>
